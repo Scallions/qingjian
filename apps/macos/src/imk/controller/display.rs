@@ -63,12 +63,15 @@ impl QingjianInputController {
         self.render(client);
     }
 
-    /// 缓冲区里只有一个 `?` 而用户按了别的键：把它还原成问号上屏（中文遵循标点设置、英文半角）、清空缓冲区。
-    /// 返回是否发生了还原。
-    pub(super) fn restore_bare_question(&self, client: TextClient<'_>) -> bool {
+    /// 缓冲区里只有一个 `?`（或以中查英的前缀键）而用户按了别的键：把它还原成那个符号上屏
+    /// （中文遵循标点设置、英文半角）、清空缓冲区。返回是否发生了还原。
+    pub(super) fn restore_bare_prefix(&self, client: TextClient<'_>) -> bool {
         let english = modifiers::caps_lock_on();
         let restored = host::with(|h| {
-            let mark = h.engine.restore_bare_question(english)?;
+            let mark = h
+                .engine
+                .restore_bare_question(english)
+                .or_else(|| h.engine.restore_bare_english_lookup())?;
             h.cancel_prediction();
             Some(mark)
         })

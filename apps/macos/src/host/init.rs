@@ -87,6 +87,14 @@ pub fn init(mtm: MainThreadMarker, info: &BundleInfo) -> Result<(), HostError> {
             Err(error) => tracing::warn!(%error, "英→中释义表加载失败"),
         }
     }
+    // 以中查英（英文模式下敲拼音出英文）的中→英表，与学习语言无关。只用随包表：个人释义表由学习语言那份读写，
+    // 两个实例写同一个文件会互相覆盖
+    if let Ok(path) = glossary_path(Language::English) {
+        match Glossary::from_path(Language::English, &path) {
+            Ok(glossary) => engine = engine.with_lookup_translator(Box::new(glossary)),
+            Err(error) => tracing::warn!(%error, "中→英释义表（以中查英）加载失败"),
+        }
+    }
     if let Some(words) = english {
         engine = engine.with_english(words);
     }

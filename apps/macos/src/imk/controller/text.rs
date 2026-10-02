@@ -43,6 +43,31 @@ impl QingjianInputController {
             self.refresh(client);
             return true;
         }
+        // 英文模式、缓冲区为空时敲以中查英前缀键（`[general] english_lookup_key`，缺省 `;`）：先收进缓冲区，
+        // 后面跟字母就按拼音查英文，跟别的键还原成它本身
+        if !composing
+            && english_candidates
+            && host::with(|h| h.engine.takes_english_lookup_key(c)).unwrap_or(false)
+        {
+            host::with(|h| {
+                h.engine.set_english_mode(true);
+                h.engine.push(c);
+            });
+            self.refresh(client);
+            return true;
+        }
+        if composing
+            && english_candidates
+            && !c.is_ascii_alphabetic()
+            && host::with(|h| h.engine.bare_english_lookup()).unwrap_or(false)
+            && self.restore_bare_prefix(client)
+        {
+            // 空格只是「把它上屏」，不再多打一个空格；其他键按非组句状态继续处理
+            if c == ' ' {
+                return true;
+            }
+            return self.handle_text(text, client);
+        }
         // 双拼下 Shift+V / Shift+U 进表达式 / 问字模式（全拼下的 v / u 被音节占了）
         if !composing && !english && host::with(|h| h.engine.takes_mode_letter(c)).unwrap_or(false)
         {
@@ -152,7 +177,7 @@ impl QingjianInputController {
             host::with(|h| h.engine.note_passthrough(c));
             return false;
         }
-        if composing && self.restore_bare_question(client) {
+        if composing && self.restore_bare_prefix(client) {
             // 空格只是「把这个 ? 上屏」，不再多打一个空格；其他键按非组句状态继续处理
             if c == ' ' {
                 return true;

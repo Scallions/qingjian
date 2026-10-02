@@ -36,9 +36,9 @@ impl QingjianInputController {
             self.refresh(client);
         } else if selector != sel!(cancelOperation:)
             && selector != sel!(complete:)
-            && self.restore_bare_question(client)
+            && self.restore_bare_prefix(client)
         {
-            // 只有一个 ? 时按了回车：回车就是「把这个 ? 上屏」，吞掉，否则聊天框里会连消息一起发出去；
+            // 只有一个 ?（或以中查英前缀键）时按了回车：回车就是「把它上屏」，吞掉，否则聊天框里会连消息一起发出去；
             // 方向键等其他键还原后交给应用
             return selector == sel!(insertNewline:);
         } else if selector == sel!(insertNewline:) {
