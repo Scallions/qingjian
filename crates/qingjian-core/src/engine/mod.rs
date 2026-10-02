@@ -25,6 +25,7 @@ mod session;
 mod setup;
 mod statistics;
 mod timings;
+mod translated;
 mod translator;
 mod vocabulary;
 
@@ -56,6 +57,7 @@ pub use raw::RawPreedit;
 pub use session::EngineSession;
 pub use statistics::{BOOKS, Book, NoUsageMeter, Usage, UsageMeter, UsageSummary, book_scale};
 pub use timings::Timings;
+pub use translated::{DEFAULT_ENGLISH_LOOKUP_KEY, is_valid_english_lookup_key};
 pub use translator::{NoTranslator, Translator};
 pub use vocabulary::{
     FRESH_UNTIL, LevelCount, NoVocabularyTracker, VocabularySummary, VocabularyTracker,
@@ -96,6 +98,15 @@ pub struct Engine {
     /// 英文候选的释义（英→中），缺省为 [`NoTranslator`]。英文候选的辅助语言是主语言中文，
     /// 与中文候选查学习语言的表分开，仍是「一个候选只显示一种辅助语言」。
     english_translator: Box<dyn Translator>,
+
+    /// 以中查英的释义表（中→英），与学习语言无关，缺省为 [`NoTranslator`]（没装就不出以中查英候选）。
+    lookup_translator: Box<dyn Translator>,
+
+    /// 英文模式下整段像拼音时自动混排以中查英候选（配置 `[general] english_lookup`，缺省开）。
+    english_lookup: bool,
+
+    /// 英文模式下进以中查英的前缀键（配置 `[general] english_lookup_key`，缺省 `;`），`None` 为关。
+    english_lookup_key: Option<char>,
 
     /// 用户词频，缺省为 [`NoLearner`]；私密输入期间只读不写（[`learning::MutedLearner`]）。
     learner: learning::MutedLearner,
@@ -308,6 +319,17 @@ const MAX_ENGLISH_WORD_LETTERS: usize = 15;
 /// 英文模式一次最多给几条候选：两页足够，再往后没人翻。
 const ENGLISH_MODE_CANDIDATES: usize = 18;
 
+/// 以中查英最多给几个中文词的释义（每个词最多两条英文）。
+const TRANSLATED_WORDS: usize = 8;
+
+/// 以中查英最多看拼音命中的前几个词找释义：再往后的词很少是用户想的意思，也省得逐个查表。
+const TRANSLATED_SCAN: usize = 40;
+
+/// 英文模式里自动混排以中查英至少几个音节、几个字母：单音节同音字太多、也太像英文（`fan` / `men`），
+/// 要查用前缀键；短串也省得每敲一键都跑一遍拼音查询。
+const MIN_TRANSLATED_SYLLABLES: usize = 2;
+const MIN_TRANSLATED_LETTERS: usize = 4;
+
 /// 英文补全至少要几个字母：太短的前缀谁都像。
 const MIN_COMPLETION_LETTERS: usize = 3;
 
@@ -388,6 +410,9 @@ impl Engine {
             extra_dictionaries: Vec::new(),
             translator: Box::new(NoTranslator),
             english_translator: Box::new(NoTranslator),
+            lookup_translator: Box::new(NoTranslator),
+            english_lookup: true,
+            english_lookup_key: Some(DEFAULT_ENGLISH_LOOKUP_KEY),
             modes: ModeKeys::default(),
             learner: learning::MutedLearner::new(Box::new(NoLearner)),
             composition: Composition::default(),

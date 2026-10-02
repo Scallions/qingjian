@@ -52,6 +52,13 @@ pub struct GeneralConfig {
     /// 英文模式（Caps Lock 亮着）是否给英文候选（补全与拼错纠正）。关掉就是纯直通。
     pub english_candidates: bool,
 
+    /// 英文模式下整段是干净的全拼（`kaifa`）时，候选里带出这个中文意思的英文（以中查英，develop / exploit）。缺省开。
+    pub english_lookup: bool,
+
+    /// 英文模式下以中查英的前缀键：没在组句时敲它，后面整段按拼音查英文（`;fan` → meal），缺省 `;`；空串关掉。
+    /// 只能是一个 ASCII 标点，不能是英文词里会出现的 `'` `-` `_`，也不能是问字的 `?`（见 [`qingjian_core::is_valid_english_lookup_key`]）。
+    pub english_lookup_key: String,
+
     /// 繁体输出模式。
     pub traditional: bool,
     /// 中文模式下中英混输时中文候选总排在英文词前面。缺省关：拼音不像话的输入（`hello`）英文词排第一，
@@ -129,6 +136,8 @@ impl Default for GeneralConfig {
             font: String::new(),
             preedit: PreeditMode::default(),
             english_candidates: true,
+            english_lookup: true,
+            english_lookup_key: qingjian_core::DEFAULT_ENGLISH_LOOKUP_KEY.to_string(),
             traditional: false,
             chinese_first: false,
             shift_letter: ShiftLetter::default(),
@@ -242,6 +251,16 @@ impl GeneralConfig {
         }
     }
 
+    /// 以中查英的前缀键；空串为关，写得不对（不是单个合法字符）时退回缺省 `;`。
+    pub fn english_lookup_key(&self) -> Option<char> {
+        let mut chars = self.english_lookup_key.trim().chars();
+        match (chars.next(), chars.next()) {
+            (None, _) => None,
+            (Some(key), None) if qingjian_core::is_valid_english_lookup_key(key) => Some(key),
+            _ => Some(qingjian_core::DEFAULT_ENGLISH_LOOKUP_KEY),
+        }
+    }
+
     /// 夹到合法范围的每页候选数。
     pub fn page_size(&self) -> usize {
         self.page_size.clamp(1, MAX_PAGE_SIZE)
@@ -305,6 +324,21 @@ mod tests {
         for bad in ["", "ab", "a", "1", "[", "中"] {
             general.aux_code_key = bad.to_owned();
             assert_eq!(general.aux_code_key(), ';', "{bad}");
+        }
+    }
+
+    #[test]
+    fn english_lookup_key_can_be_switched_off_and_falls_back_to_the_default() {
+        let mut general = GeneralConfig::default();
+        assert!(general.english_lookup);
+        assert_eq!(general.english_lookup_key(), Some(';'));
+        general.english_lookup_key = "`".to_owned();
+        assert_eq!(general.english_lookup_key(), Some('`'));
+        general.english_lookup_key = String::new();
+        assert_eq!(general.english_lookup_key(), None);
+        for bad in ["ab", "a", "'", "-", "?", "中"] {
+            general.english_lookup_key = bad.to_owned();
+            assert_eq!(general.english_lookup_key(), Some(';'), "{bad}");
         }
     }
 

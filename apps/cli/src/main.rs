@@ -183,6 +183,16 @@ fn build_engine(args: &Args) -> Result<Engine, CliError> {
         tracing::info!(glosses = glossary.len(), "英→中释义表已加载");
         engine = engine.with_english_translator(Box::new(glossary));
     }
+    // 以中查英（英文模式下敲拼音出英文）用中→英表，学习语言不是英文时另装一份
+    let en_glossary = if language == Language::English {
+        glossary_path.clone()
+    } else {
+        args::default_data_file("glossary-en.tsv")
+    };
+    if en_glossary.is_file() {
+        let glossary = Glossary::from_path(Language::English, &en_glossary)?;
+        engine = engine.with_lookup_translator(Box::new(glossary));
+    }
     if let Some(words) = english {
         engine = engine.with_english(words);
     }
@@ -328,6 +338,8 @@ fn build_engine(args: &Args) -> Result<Engine, CliError> {
         tracing::info!(table = %path.display(), "形码码表已载入");
     }
     engine.set_aux_code_key(config.general.aux_code_key(), config.general.page_keys());
+    engine.set_english_lookup(config.general.english_lookup);
+    engine.set_english_lookup_key(config.general.english_lookup_key());
     engine.set_aux_keep_empty(config.general.aux_code_keep_empty);
     if !args.aux_table.is_empty() {
         let mut tables: Vec<Arc<dyn AuxCodeLookup>> = Vec::new();

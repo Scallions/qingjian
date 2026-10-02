@@ -4,7 +4,7 @@ use super::Engine;
 use super::input_log::{CommitEntry, InputLogEntry, InputLogger, InputSource, LOGGED_CANDIDATES};
 use super::statistics::Usage;
 use super::vocabulary::{FRESH_UNTIL, VocabularySummary};
-use crate::candidate::{Candidate, CandidateKind, Translation};
+use crate::candidate::{Candidate, CandidateKind, Language, Translation};
 use crate::sentence;
 
 mod forgotten;
@@ -42,6 +42,14 @@ impl Engine {
         self.displayed.clear();
         for candidate in candidates {
             if candidate.kind == CandidateKind::English {
+                continue;
+            }
+            // 以中查英：看到的英文是候选本身，注释里的中文不是学习语言
+            if candidate.kind == CandidateKind::Translated {
+                let key = (Language::English, candidate.text.clone());
+                if !self.displayed.contains(&key) {
+                    self.displayed.push(key);
+                }
                 continue;
             }
             let Some(translation) = &candidate.translation else {
@@ -88,6 +96,7 @@ impl Engine {
                 })
             }
             InputSource::English
+            | InputSource::Translated
             | InputSource::Custom
             | InputSource::Shortcut
             | InputSource::Emoji
@@ -161,7 +170,7 @@ impl Engine {
             CandidateKind::Chinese | CandidateKind::Code | CandidateKind::Cloud => {
                 self.learner.forget(&candidate.text)
             }
-            CandidateKind::English => Forgotten {
+            CandidateKind::English | CandidateKind::Translated => Forgotten {
                 user_word: self.learner.forget_english(&candidate.text),
                 learning: false,
             },

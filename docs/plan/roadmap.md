@@ -66,6 +66,8 @@
 - [x] 中英切换：Caps Lock 亮着 = 英文模式（默认小写、Shift 大写、标点半角）；按住 Shift 的大写字母直接透传；切换输入源时强制收窗
 - [x] 英文模式候选（Core `english`，`Engine::set_english_mode`）：词表精确词 / 前缀补全 / 一处编辑纠正，Tab 与上下键选词（上下键动过之后空格也选），空格回车标点原样上屏；
   `[general] english_candidates` 可关；CLI `--english-mode`
+- [x] 以中查英（2026-10-02）：英文模式下敲拼音出中文词对应的英文（`kaifa` → develop / exploit），整段是两个音节以上的干净全拼时自动混排在英文补全之后，
+  `;` 开头强制按拼音查；`CandidateKind::Translated`，候选文本即英文、注释是中文；`[general] english_lookup` / `english_lookup_key`（见 candidate-ui.md）
 - [x] 按应用关英文候选（2026-09-05）：`[apps] english_candidates_off`，按 `bundleIdentifier` 认，缺省终端 / 编辑器 / IDE 名单，`*` 前缀匹配；
   偏好设置「通用」页勾选框；`[apps]` 分节留给以后的按应用 preedit 模式
 - [x] 个人英文词表（2026-09-05，`user-english.tsv`）：回车 / 英文模式直通原样上屏的英文词（切不成完整拼音的字母串）与选过的英文候选都记，

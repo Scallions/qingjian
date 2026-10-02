@@ -38,6 +38,8 @@ impl Engine {
             }
             candidate.translation = match candidate.kind {
                 CandidateKind::Custom(_) => None,
+                // 以中查英的注释（中文词本身）查询时就带好了
+                CandidateKind::Translated => candidate.translation.take(),
                 // 英文候选按敲的大小写显示（Company / COMPANY），释义表键是小写
                 CandidateKind::English => self.english_translator.translate(text).or_else(|| {
                     self.english_translator
@@ -149,6 +151,16 @@ impl Engine {
             // 模型直接生成的整句没有音节对齐（`yongdockerbushuhenfangbian` 的 `docker` 不是拼音），
             // 按音节消耗拼音对不上，吃掉整段作用域；也因此没法拆成词记学习
             CandidateKind::Generated => self.whole_scope(),
+            // 以中查英：吃掉整段（含前缀键）；英文进个人英文词表，下次敲它的前缀就有；这串拼音下记住选了哪个英文。
+            // 中文词本身没上屏，不记中文的词频与转移
+            CandidateKind::Translated => {
+                self.learner.record(candidate);
+                self.learner.learn_english(&candidate.text);
+                let (consumed, _) = self.whole_scope();
+                let input = self.translated_choice_key(self.composition.scope());
+                self.learner.record_choice(&input, &candidate.text);
+                (consumed, input)
+            }
             // 英文词与快捷候选对应整段作用域；选中的英文词记次数并进个人英文词表，下次同样的前缀它靠前
             CandidateKind::English | CandidateKind::Shortcut | CandidateKind::Custom(_) => {
                 if candidate.kind == CandidateKind::English {
@@ -174,9 +186,17 @@ impl Engine {
         }
         let log_id = self.log_commit(&keys, &candidate.text, source);
         self.meter_commit(&candidate.text, source, false);
-        // 上屏带译词的中文候选：那一刻用户看着这条译词，记进词汇（英文候选的中文释义不是学习语言，不记）
+        // 上屏带译词的中文候选：那一刻用户看着这条译词，记进词汇（英文候选的中文释义不是学习语言，不记）。
+        // 以中查英上屏的英文本身就是用出去的英文词
+        if !self.private && candidate.kind == CandidateKind::Translated {
+            self.vocabulary
+                .record_commit(Language::English, &candidate.text, true);
+        }
         if !self.private
-            && candidate.kind != CandidateKind::English
+            && !matches!(
+                candidate.kind,
+                CandidateKind::English | CandidateKind::Translated
+            )
             && let Some(translation) = &candidate.translation
         {
             for (index, sense) in translation.senses().iter().enumerate() {
@@ -243,6 +263,7 @@ impl Engine {
                 None => self.chain.reset(),
             },
             CandidateKind::English
+            | CandidateKind::Translated
             | CandidateKind::Shortcut
             | CandidateKind::Custom(_)
             | CandidateKind::Emoji

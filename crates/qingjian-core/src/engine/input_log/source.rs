@@ -33,6 +33,9 @@ pub enum InputSource {
     /// 上屏的是候选的译词（修饰键 + 数字）。
     Translation,
 
+    /// 英文模式下以中查英的英文候选。
+    Translated,
+
     /// Tab 接受的云端整句补全。
     CloudSentence,
 }
@@ -46,6 +49,7 @@ impl From<CandidateKind> for InputSource {
             // 模型直接生成的也是整句，回放时与词图出的整句同一类看
             CandidateKind::Sentence | CandidateKind::Generated => Self::Sentence,
             CandidateKind::English => Self::English,
+            CandidateKind::Translated => Self::Translated,
             CandidateKind::Shortcut => Self::Shortcut,
             CandidateKind::Custom(_) => Self::Custom,
             CandidateKind::Emoji => Self::Emoji,

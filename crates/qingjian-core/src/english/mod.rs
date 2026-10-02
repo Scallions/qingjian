@@ -3,9 +3,11 @@
 //! 空格与标点仍原样上屏敲的字母，候选只在按 Tab 或方向键选中时才用上，所以候选再多也不碍事。
 
 mod edit;
+mod suggestion;
 
 pub use edit::within_one_edit;
 use qingjian_dictionary::WordList;
+pub use suggestion::Suggestion;
 
 /// 拼错纠正至少要几个字母：三个字母以内一处编辑能变出太多词，只补全不纠正。
 pub const MIN_CORRECTION_LETTERS: usize = 4;
@@ -20,15 +22,30 @@ pub fn suggest(
     weight: impl Fn(&str) -> u32,
     limit: usize,
 ) -> Vec<String> {
+    suggest_tagged(lists, typed, weight, limit)
+        .into_iter()
+        .map(Suggestion::into_text)
+        .collect()
+}
+
+/// 同 [`suggest`]，每条带上它属于哪一组。
+pub fn suggest_tagged(
+    lists: &[&WordList],
+    typed: &str,
+    weight: impl Fn(&str) -> u32,
+    limit: usize,
+) -> Vec<Suggestion> {
     let code = typed.to_ascii_lowercase();
     if code.is_empty() || limit == 0 {
         return Vec::new();
     }
-    let mut result: Vec<String> = Vec::with_capacity(limit);
+    let mut result: Vec<Suggestion> = Vec::with_capacity(limit);
     if let Some(word) = lists.iter().find_map(|words| words.get(&code)) {
-        result.push(adapt_case(word, typed));
+        result.push(Suggestion::Exact(adapt_case(word, typed)));
     }
-    let ranked = |mut hits: Vec<(&str, u32)>, result: &mut Vec<String>| {
+    let ranked = |mut hits: Vec<(&str, u32)>,
+                  result: &mut Vec<Suggestion>,
+                  tag: fn(String) -> Suggestion| {
         hits.sort_by(|a, b| {
             weight(b.0)
                 .cmp(&weight(a.0))
@@ -40,8 +57,8 @@ pub fn suggest(
                 break;
             }
             let word = adapt_case(word, typed);
-            if !result.contains(&word) {
-                result.push(word);
+            if !result.iter().any(|s| s.text() == word) {
+                result.push(tag(word));
             }
         }
     };
@@ -50,7 +67,7 @@ pub fn suggest(
         .filter(|(entry_code, _, _)| entry_code.len() > code.len() && entry_code.starts_with(&code))
         .map(|(_, word, frequency)| (word, frequency))
         .collect();
-    ranked(completions, &mut result);
+    ranked(completions, &mut result, Suggestion::Completion);
     // 带数字或符号的（`foo1`、`x_y`）是标识符不是拼错的词，不去猜
     let letters_only = code.bytes().all(|b| b.is_ascii_lowercase());
     if letters_only && code.len() >= MIN_CORRECTION_LETTERS && result.len() < limit {
@@ -62,7 +79,7 @@ pub fn suggest(
             })
             .map(|(_, word, frequency)| (word, frequency))
             .collect();
-        ranked(corrections, &mut result);
+        ranked(corrections, &mut result, Suggestion::Correction);
     }
     result
 }
@@ -144,5 +161,22 @@ mod tests {
         // 精确词后面跟着差一处编辑的 gift
         assert_eq!(suggest(&[&user, &main], "gist", |_| 0, 9), ["gist", "gift"]);
         assert_eq!(suggest(&[&main], "gis", |_| 0, 9), ["gist"]);
+    }
+
+    #[test]
+    fn tagged_suggestions_keep_their_group() {
+        let list = words();
+        assert_eq!(
+            suggest_tagged(&[&list], "comma", |_| 0, 9),
+            [Suggestion::Exact("comma".to_owned())]
+        );
+        // hollow 是前缀补全，hello 差一处编辑
+        assert_eq!(
+            suggest_tagged(&[&list], "hollo", |_| 0, 9),
+            [
+                Suggestion::Completion("hollow".to_owned()),
+                Suggestion::Correction("hello".to_owned()),
+            ]
+        );
     }
 }

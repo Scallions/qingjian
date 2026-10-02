@@ -73,29 +73,49 @@ impl Engine {
     }
 
     /// 英文模式：敲的字母原样显示，候选是英文词表的精确词、前缀补全与拼错纠正（见 [`english::suggest`]），
-    /// 词表没装就没有候选。emoji 照配，但排在所有词后面：选词靠上下键，emoji 夹在词中间会挡路。
+    /// 词表没装就没有候选。整段是干净的全拼时以中查英的候选插在前几条补全之后、其余补全与纠正之前
+    /// （`kaifa` → develop / exploit）；前缀键开头的整段只查英文（见 [`Self::query_translated`]）。
+    /// emoji 照配，但排在所有词后面：选词靠上下键，emoji 夹在词中间会挡路。
     pub(in crate::engine) fn query_english(
         &self,
         scope: &str,
         rest: String,
         start: Instant,
     ) -> Query {
-        let mut items: Vec<Candidate> = english::suggest(
-            &self.english_lists(),
-            scope,
-            |text| self.learner.weight(text),
-            ENGLISH_MODE_CANDIDATES,
-        )
-        .into_iter()
-        .map(|text| Candidate {
+        if let Some(body) = self.english_lookup_body(scope) {
+            return self.query_translated(scope, body, rest, start);
+        }
+        let english_candidate = |text| Candidate {
             text,
             kind: CandidateKind::English,
             syllables: Vec::new(),
             reading: None,
             translation: None,
             aux_code: None,
-        })
-        .collect();
+        };
+        let mut translated = Some(self.auto_translated(scope));
+        let mut items: Vec<Candidate> = Vec::new();
+        let mut completions = 0;
+        for suggestion in english::suggest_tagged(
+            &self.english_lists(),
+            scope,
+            |text| self.learner.weight(text),
+            ENGLISH_MODE_CANDIDATES,
+        ) {
+            let make_room = match suggestion {
+                english::Suggestion::Exact(_) => false,
+                english::Suggestion::Completion(_) => {
+                    completions += 1;
+                    completions > ENGLISH_COMPLETIONS
+                }
+                english::Suggestion::Correction(_) => true,
+            };
+            if make_room && let Some(translated) = translated.take() {
+                items.extend(translated);
+            }
+            items.push(english_candidate(suggestion.into_text()));
+        }
+        items.extend(translated.into_iter().flatten());
         self.insert_emoji(&mut items);
         items.sort_by_key(|c| c.kind == CandidateKind::Emoji);
         Query {

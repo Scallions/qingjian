@@ -217,6 +217,12 @@ font = ""
 preedit = "both"
 # 英文模式（Caps Lock 亮着）是否给英文候选：Tab 或方向键选词，空格、回车、标点仍原样上屏敲的字母；false 就是纯直通
 english_candidates = true
+# 英文模式下用拼音查英文：整段是完整的全拼（kaifa）时，候选里带出「开发」对应的英文（develop / exploit），选中上屏英文；
+# 英文词仍排在前面。双拼与注音下不自动查，用下面的前缀键
+english_lookup = true
+# 英文模式下查英文的前缀键：没在组句时先敲它，后面整段按拼音查（;fan 出 meal / rice），单个音节也能查；
+# 后面紧跟的不是字母就还原成这个符号本身。留空关掉；不能是 ' - _ ?
+english_lookup_key = ";"
 
 # 繁体输出模式。开启后上屏繁体，不影响词库和个人词频的简体记录。
 traditional = false

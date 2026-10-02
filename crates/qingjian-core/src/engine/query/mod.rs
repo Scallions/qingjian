@@ -11,6 +11,7 @@ mod modes;
 mod phonetic;
 mod result;
 mod snapshot;
+mod translating;
 
 pub(crate) use english_tail::EnglishTail;
 pub use result::Query;
