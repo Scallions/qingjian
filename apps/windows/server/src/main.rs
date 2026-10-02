@@ -151,6 +151,7 @@ fn main() {
     let spec = AssemblySpec {
         glossary: glossary.clone(),
         english_glossary: glossary_file(&root, Language::Chinese),
+        lookup_glossary: glossary_file(&root, Language::English),
         english: generated(&root, "english.tsv"),
         emoji: ["emoji-zh.tsv", "emoji-en.tsv"]
             .into_iter()
@@ -180,6 +181,8 @@ fn main() {
     engine.set_mode_keys(config.shortcut.mode);
     engine.set_aux_code_key(config.general.aux_code_key(), config.general.page_keys());
     engine.set_aux_keep_empty(config.general.aux_code_keep_empty);
+    engine.set_english_lookup(config.general.english_lookup);
+    engine.set_english_lookup_key(config.general.english_lookup_key());
     engine.set_aux_enabled(config.aux_code.enabled);
     engine.set_aux_show(config.general.aux_code_show);
     engine.set_chinese_first(config.general.chinese_first);

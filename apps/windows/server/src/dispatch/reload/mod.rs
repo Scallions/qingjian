@@ -203,6 +203,10 @@ impl Router {
             .set_aux_code_key(config.general.aux_code_key(), config.general.page_keys());
         self.engine
             .set_aux_keep_empty(config.general.aux_code_keep_empty);
+        self.engine
+            .set_english_lookup(config.general.english_lookup);
+        self.engine
+            .set_english_lookup_key(config.general.english_lookup_key());
         self.engine.set_aux_enabled(config.aux_code.enabled);
         self.engine.set_aux_show(config.general.aux_code_show);
         self.engine.set_chinese_first(config.general.chinese_first);

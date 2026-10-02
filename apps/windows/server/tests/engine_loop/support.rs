@@ -76,7 +76,8 @@ pub fn router_in(config: RouterConfig, app: Option<String>) -> Router {
     let dict = root.join("assets/sample/dict.tsv");
     let glossary = root.join("assets/sample/glossary-en.tsv");
     let mut engine = assembly::assemble(&AssemblySpec {
-        glossary: Some((Language::English, glossary)),
+        glossary: Some((Language::English, glossary.clone())),
+        lookup_glossary: Some(glossary),
         english: Some(root.join("assets/sample/english.tsv")),
         ..AssemblySpec::new(dict)
     })

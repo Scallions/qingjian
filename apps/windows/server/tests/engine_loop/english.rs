@@ -189,3 +189,49 @@ fn english_digit_without_a_slot_joins_the_word() {
     assert_eq!((outcome, commit), (KeyOutcome::Consumed, None));
     assert_eq!(preedit(&frame), "hello9");
 }
+
+#[test]
+fn english_mode_looks_up_english_by_pinyin() {
+    let mut router = router();
+    // 整段是干净的全拼：候选是「开发」的英文，空格上屏英文、后面接空格
+    let (_, _, frame) = type_english(&mut router, "kaifa");
+    assert_eq!(preedit(&frame), "kaifa");
+    assert_eq!(candidate_texts(&frame)[..2], ["develop", "development"]);
+    let (outcome, commit, after) = press(&mut router, KeyEvent::new(0x20, Some(' '), ENGLISH));
+    assert_eq!(
+        (outcome, commit.as_deref()),
+        (KeyOutcome::Consumed, Some("develop "))
+    );
+    assert!(after.is_empty());
+}
+
+#[test]
+fn lookup_prefix_key_queries_pinyin_and_restores_when_alone() {
+    let semicolon = KeyEvent::new(0xBA, Some(';'), ENGLISH);
+    let mut router = router();
+    // 前缀键进来，单音节也查；数字选词
+    let (outcome, commit, frame) = press(&mut router, semicolon);
+    assert_eq!((outcome, commit), (KeyOutcome::Consumed, None));
+    assert_eq!(preedit(&frame), ";");
+    let (_, _, frame) = type_english(&mut router, "kai");
+    assert_eq!(preedit(&frame), ";kai");
+    assert_eq!(candidate_texts(&frame), ["open"]);
+    let (_, commit, after) = press(&mut router, KeyEvent::new(0x31, Some('1'), ENGLISH));
+    assert_eq!(commit.as_deref(), Some("open"));
+    assert!(after.is_empty());
+    // 单独的前缀键：空格 / 回车只把它上屏，退格删掉它
+    press(&mut router, semicolon);
+    let (_, commit, frame) = press(&mut router, KeyEvent::new(0x20, Some(' '), ENGLISH));
+    assert_eq!(commit.as_deref(), Some(";"));
+    assert!(preedit(&frame).is_empty());
+    press(&mut router, semicolon);
+    let (outcome, commit, _) = press(&mut router, function_key(0x0D));
+    assert_eq!(
+        (outcome, commit.as_deref()),
+        (KeyOutcome::Consumed, Some(";"))
+    );
+    press(&mut router, semicolon);
+    let (_, commit, frame) = press(&mut router, function_key(0x08));
+    assert_eq!(commit, None);
+    assert!(preedit(&frame).is_empty());
+}

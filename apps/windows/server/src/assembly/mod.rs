@@ -67,6 +67,13 @@ pub fn assemble(spec: &AssemblySpec) -> Result<Engine, ServerError> {
             Err(error) => tracing::warn!(%error, "英→中释义表加载失败"),
         }
     }
+    // 以中查英只用随包表：个人释义表由学习语言那份读写，两个实例写同一个文件会互相覆盖
+    if let Some(path) = &spec.lookup_glossary {
+        match Glossary::from_path(Language::English, path) {
+            Ok(glossary) => engine = engine.with_lookup_translator(Box::new(glossary)),
+            Err(error) => tracing::warn!(%error, "中→英释义表（以中查英）加载失败"),
+        }
+    }
     if let Some(path) = &spec.english {
         let words = WordList::from_path(path)?;
         tracing::info!(words = words.len(), "英文词表已加载");
