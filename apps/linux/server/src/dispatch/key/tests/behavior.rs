@@ -1,6 +1,8 @@
 //! 数字缺席、直输、英文候选与小键盘的实际上屏结果。
 use super::support::{compose, key, router};
+use qingjian_core::Language;
 use qingjian_platform::protocol::{KeyModifiers, KeyOutcome};
+use qingjian_translate::Glossary;
 
 #[test]
 fn absent_slot_keeps_digit_in_buffer_and_raw_submission() {
@@ -54,6 +56,35 @@ fn english_candidates_select_current_page_and_preserve_trailing_space() {
         key(&mut router, 13, None, english).1.as_deref(),
         Some("hel9")
     );
+}
+#[test]
+fn lookup_prefix_key_queries_pinyin_and_restores_when_alone() {
+    let mut router = router(5);
+    router.engine.set_lookup_translator(Box::new(
+        Glossary::parse(
+            Language::English,
+            "你	pron. you
+",
+        )
+        .unwrap(),
+    ));
+    let english = KeyModifiers {
+        english_mode: true,
+        ..Default::default()
+    };
+    // 前缀键后面整段按拼音查英文，空格上屏英文再接空格
+    compose(&mut router, ";ni", english);
+    let frame = key(&mut router, 0, None, english).2;
+    assert_eq!(frame.candidates.items[0].text, "you");
+    assert_eq!(
+        key(&mut router, 32, Some(' '), english).1.as_deref(),
+        Some("you ")
+    );
+    // 单独的前缀键遇到空格就还原成它本身
+    key(&mut router, 0xBA, Some(';'), english);
+    let result = key(&mut router, 32, Some(' '), english);
+    assert_eq!(result.1.as_deref(), Some(";"));
+    assert!(result.2.is_empty());
 }
 #[test]
 fn keypad_punctuation_is_half_width_and_regular_punctuation_is_full_width() {

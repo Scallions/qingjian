@@ -17,6 +17,9 @@ pub struct AssemblySpec {
     /// 英→中释义表（英文候选的中文释义）。
     pub english_glossary: Option<PathBuf>,
 
+    /// 中→英释义表（英文模式下以中查英），与学习语言无关。
+    pub lookup_glossary: Option<PathBuf>,
+
     /// 英文词表。
     pub english: Option<PathBuf>,
 
@@ -51,6 +54,7 @@ impl AssemblySpec {
             dict: dict.into(),
             glossary: None,
             english_glossary: None,
+            lookup_glossary: None,
             english: None,
             emoji: Vec::new(),
             language_model: None,

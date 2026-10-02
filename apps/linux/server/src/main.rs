@@ -53,6 +53,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             .then(|| glossary(language).map(|p| (language, p)))
             .flatten(),
         english_glossary: glossary(Language::Chinese),
+        lookup_glossary: glossary(Language::English),
         english: paths::generated(&root, "english.tsv")
             .or_else(|| paths::asset(&root, "sample/english.tsv")),
         emoji: ["emoji/emoji-zh.tsv", "emoji/emoji-en.tsv"]
@@ -84,6 +85,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     engine.set_learning(config.general.learning);
     engine.set_chinese_first(config.general.chinese_first);
     engine.set_mode_keys(config.shortcut.mode);
+    engine.set_english_lookup(config.general.english_lookup);
+    engine.set_english_lookup_key(config.general.english_lookup_key());
     engine
         .set_custom_phrases(config.custom_phrases.clone())
         .map_err(std::io::Error::other)?;

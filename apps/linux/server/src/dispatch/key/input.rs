@@ -36,6 +36,23 @@ impl Router {
             self.engine.push(c);
             return Effect::Changed(None);
         }
+        // 英文模式、缓冲区为空时敲以中查英前缀键（`[general] english_lookup_key`，缺省 `;`）：先收进缓冲区，
+        // 后面跟字母就按拼音查英文，跟别的键还原成它本身。
+        if !self.composing() && english_candidates && self.engine.takes_english_lookup_key(c) {
+            self.engine.set_english_mode(true);
+            self.engine.push(c);
+            return Effect::Changed(None);
+        }
+        if english_candidates && !c.is_ascii_alphabetic() && self.engine.bare_english_lookup() {
+            let mark = self
+                .engine
+                .restore_bare_english_lookup()
+                .unwrap_or_default();
+            if c == ' ' {
+                return Effect::Changed(Some(mark));
+            }
+            return with_prefix(Some(mark), self.apply_key(event), c);
+        }
         // 双拼下 Shift+V / Shift+U 进表达式 / 问字模式（全拼下的 v / u 被音节占了）。
         if !self.composing() && !english && self.engine.takes_mode_letter(c) {
             self.engine.set_english_mode(false);
@@ -98,6 +115,13 @@ impl Router {
         {
             let english = event.modifiers.caps || event.modifiers.english_mode;
             return Effect::Changed(Some(self.restore_bare_question(english)));
+        }
+        // 以中查英的前缀键同理：回车 / Tab / 方向键把它还原上屏、键本身吞掉
+        if self.engine.bare_english_lookup()
+            && !matches!(event.virtual_key, codes::BACK | codes::ESCAPE)
+            && let Some(mark) = self.engine.restore_bare_english_lookup()
+        {
+            return Effect::Changed(Some(mark));
         }
         match event.virtual_key {
             codes::BACK => {
